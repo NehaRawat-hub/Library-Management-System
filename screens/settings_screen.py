@@ -1,17 +1,15 @@
 """
 screens/settings_screen.py
 --------------------------
-System Settings management screen -- primary GUI implementation of the
-assigned Q11 "System Settings" and "Config Files" quality features.
-
+System Settings management screen.
 Allows administrators to review and update operational parameters:
-  - Overdue Days (loan duration)
-  - Default Fine Per Day
+  - Overdue Days (standard loan duration)
+  - Default Fine Per Day (INR)
   - Max Books Allowed Per Member
   - Application Title
-  - Active Theme & Accent Color
+  - Active Theme & Date Format
 
-All modifications are validated, saved to config/settings.json,
+Modifications are validated, saved to config/settings.json,
 mirrored in the SQLite system_settings table, and recorded in audit_logs.
 """
 
@@ -25,22 +23,23 @@ from utils.error_handler import handle_exception
 
 
 def render(app):
+    theme = app.get_theme()
     body = app.base(
-        "System Settings",
-        "Q11 Feature: Centralized system configuration & runtime settings"
+        "System Settings & Preferences",
+        "Configure operational loan durations, overdue fine policies, and interface settings"
     )
 
     current_settings = load_settings()
 
-    # Main Card
-    card = tk.Frame(body, bg="white", bd=1, relief="solid", padx=30, pady=24)
+    # Main Settings Card
+    card = tk.Frame(body, bg=theme["bg_card"], bd=1, relief="solid", padx=30, pady=24)
     card.pack(fill="x", pady=10)
 
     tk.Label(
         card,
-        text="Application & Loan Parameters",
-        bg="white",
-        fg="#16202a",
+        text="Circulation & Application Parameters",
+        bg=theme["bg_card"],
+        fg=theme["fg_header"],
         font=("Segoe UI", 13, "bold")
     ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 15))
 
@@ -51,7 +50,7 @@ def render(app):
         ("fine_per_day", "Fine Per Day (INR):", str(current_settings.get("fine_per_day", 5))),
         ("max_books_per_member", "Max Books Per Member:", str(current_settings.get("max_books_per_member", 3))),
         ("date_format", "Date Format:", current_settings.get("date_format", "%Y-%m-%d")),
-        ("theme", "Theme:", current_settings.get("theme", "System")),
+        ("theme", "Active Theme:", app.theme_mode),
     ]
 
     entries = {}
@@ -59,13 +58,13 @@ def render(app):
         tk.Label(
             card,
             text=label_text,
-            bg="white",
-            fg="#2c3e50",
+            bg=theme["bg_card"],
+            fg=theme["fg_body"],
             font=("Segoe UI", 10, "bold")
         ).grid(row=idx, column=0, sticky="w", pady=8, padx=(0, 15))
 
         if key == "theme":
-            combo = ttk.Combobox(card, values=["System", "Light", "Dark Slate", "Executive Blue"], width=32, state="readonly")
+            combo = ttk.Combobox(card, values=["Light", "Dark"], width=32, state="readonly")
             combo.set(default_val)
             combo.grid(row=idx, column=1, sticky="w", pady=8)
             entries[key] = combo
@@ -76,7 +75,7 @@ def render(app):
             entries[key] = entry
 
     # Button Bar
-    btn_frame = tk.Frame(body, bg="#f4f6f8")
+    btn_frame = tk.Frame(body, bg=theme["bg_main"])
     btn_frame.pack(fill="x", pady=15)
 
     def save_action():
@@ -85,12 +84,12 @@ def render(app):
             messagebox.showwarning(
                 "Access Restricted",
                 "Only users with the 'Admin' role can modify system settings.\n"
-                f"Current user: {getattr(app, 'username', 'staff')} ({getattr(app, 'role', 'Staff')})"
+                f"Current session: {getattr(app, 'username', 'staff')} ({getattr(app, 'role', 'Staff')})"
             )
             return
 
         try:
-            # Poka-Yoke Input Validation
+            # Validation
             app_title = entries["app_name"].get().strip()
             if not app_title:
                 raise ValueError("Application title cannot be empty.")
@@ -116,13 +115,15 @@ def render(app):
             except ValueError:
                 raise ValueError("Max books per member must be a positive integer.")
 
+            chosen_theme = entries["theme"].get()
+
             new_settings = {
                 "app_name": app_title,
                 "overdue_days": overdue,
                 "fine_per_day": fine,
                 "max_books_per_member": max_books,
                 "date_format": entries["date_format"].get().strip() or "%Y-%m-%d",
-                "theme": entries["theme"].get(),
+                "theme": chosen_theme,
             }
 
             # 1. Save to config/settings.json
@@ -145,10 +146,16 @@ def render(app):
                 app.role,
                 "Settings",
                 "SYSTEM_SETTINGS_UPDATED",
-                f"overdue={overdue}, fine={fine}, max_books={max_books}"
+                f"overdue={overdue}, fine={fine}, max_books={max_books}, theme={chosen_theme}"
             )
 
-            messagebox.showinfo("Success", "System settings successfully updated and saved to config/settings.json.")
+            # Update app theme if changed
+            if app.theme_mode != chosen_theme:
+                app.theme_mode = chosen_theme
+                app.apply_theme_styles()
+
+            messagebox.showinfo("Success", "System settings successfully updated and saved.")
+            app.show_settings()
 
         except Exception as exc:
             handle_exception(getattr(app, "username", "admin"), "Settings", "Save settings", exc)
@@ -170,56 +177,58 @@ def render(app):
             entries["max_books_per_member"].insert(0, "3")
             entries["date_format"].delete(0, tk.END)
             entries["date_format"].insert(0, "%Y-%m-%d")
-            entries["theme"].set("System")
+            entries["theme"].set("Light")
             save_action()
 
     tk.Button(
         btn_frame,
         text="Save Settings",
         command=save_action,
-        bg="#16202a",
+        bg=theme["accent"],
         fg="white",
         font=("Segoe UI", 10, "bold"),
         padx=18,
         pady=8,
-        bd=0
+        bd=0,
+        cursor="hand2"
     ).pack(side="left", padx=(0, 10))
 
     tk.Button(
         btn_frame,
         text="Reset to Defaults",
         command=reset_defaults_action,
-        bg="#7f8c8d",
+        bg="#64748b",
         fg="white",
         font=("Segoe UI", 10),
         padx=14,
         pady=8,
-        bd=0
+        bd=0,
+        cursor="hand2"
     ).pack(side="left")
 
-    # Q11 Note Card
-    info_card = tk.Frame(body, bg="#ebf5fb", bd=1, relief="solid", padx=20, pady=15)
+    # Policy Notes Card (Clean administrative info, no TQM academic meta-text)
+    info_card = tk.Frame(body, bg=theme["bg_card"], bd=1, relief="solid", padx=20, pady=15)
     info_card.pack(fill="x", pady=10)
 
     tk.Label(
         info_card,
-        text="TQM Quality Goal Q11 — Improve Maintainability Highlights:",
-        bg="#ebf5fb",
-        fg="#1b4f72",
+        text="Circulation & System Architecture Notes:",
+        bg=theme["bg_card"],
+        fg=theme["fg_header"],
         font=("Segoe UI", 10, "bold")
     ).pack(anchor="w")
 
     explanation = (
-        "• Decoupled Configuration: Operational policies (loan period, fines) are not hardcoded into business logic.\n"
-        "• Dual Persistence: Stored as human-readable JSON (config/settings.json) and queryable SQLite (system_settings).\n"
-        "• Zero-Downtime Reconfiguration: Changes take effect immediately without recompilation or redeployment.\n"
-        "• Full Traceability: Every configuration change is recorded in audit_logs with administrator attribution."
+        "• Loan Period: Standard borrowing window before items are flagged overdue.\n"
+        "• Overdue Fines: Automatically calculated per calendar day past due date.\n"
+        "• Quota Limit: Prevents hoarding by restricting simultaneous active borrowings per member.\n"
+        "• Security: Changes are restricted to Admin role and recorded in the audit trail."
     )
     tk.Label(
         info_card,
         text=explanation,
-        bg="#ebf5fb",
-        fg="#2c3e50",
+        bg=theme["bg_card"],
+        fg=theme["fg_body"],
         font=("Segoe UI", 9),
         justify="left"
     ).pack(anchor="w", pady=(5, 0))
