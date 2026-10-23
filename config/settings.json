@@ -2,6 +2,6 @@
   "app_name": "Library Management System",
   "date_format": "%Y-%m-%d",
   "overdue_days": 14,
-  "theme": "System",
+  "theme": "Dark",
   "accent_color": "blue"
 }
