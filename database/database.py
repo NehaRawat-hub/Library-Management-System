@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Staff'
+    role TEXT NOT NULL DEFAULT 'Staff',
+    member_code TEXT
 );
 
 CREATE TABLE IF NOT EXISTS books (
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS members (
     name TEXT NOT NULL,
     email TEXT,
     phone TEXT,
+    member_type TEXT DEFAULT 'Student',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -83,9 +85,21 @@ def connect():
 def initialize():
     con = connect()
     con.executescript(SCHEMA)
-    con.execute("INSERT OR IGNORE INTO users(username,password,role) VALUES(?,?,?)",
+
+    # Safe column migrations for existing databases
+    try:
+        con.execute("ALTER TABLE users ADD COLUMN member_code TEXT")
+    except Exception:
+        pass
+    try:
+        con.execute("ALTER TABLE members ADD COLUMN member_type TEXT DEFAULT 'Student'")
+    except Exception:
+        pass
+
+    # Ensure baseline administrative users
+    con.execute("INSERT OR IGNORE INTO users(username, password, role) VALUES(?, ?, ?)",
                 ("admin", "admin123", "Admin"))
-    con.execute("INSERT OR IGNORE INTO users(username,password,role) VALUES(?,?,?)",
+    con.execute("INSERT OR IGNORE INTO users(username, password, role) VALUES(?, ?, ?)",
                 ("staff", "staff123", "Staff"))
     con.commit()
     con.close()
