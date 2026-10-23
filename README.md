@@ -1,104 +1,131 @@
 # Library Management System — BBAT104 TQM Course Project
 
-**Student:** Neha Rawat &nbsp;|&nbsp; **Reg. No.:** 2410302041 &nbsp;|&nbsp; **Section:** B
-**Baseline System:** Library Management System
-**Assigned Quality Goal:** Q11 — Improve Maintainability
-**Suggested Q11 features implemented:** Modular Structure, Config Files, System Settings, Activity Logs, Code Comments
-
-A Python + Tkinter + SQLite Library Management System built for the BBAT104
-Fundamentals of TQM course project, with Total Quality Management tools
-(SIPOC, CTQ tree, FMEA, Pareto, Fishbone, PDCA) applied throughout.
+**Student:** Neha Rawat &nbsp;|&nbsp; **Reg. No.:** 2410302041 &nbsp;|&nbsp; **Section:** B  
+**Course:** BBAT104 — Fundamentals of TQM, Academic Session 2026–27  
+**Baseline System:** Library Management System  
+**Assigned Quality Goal:** Q11 — Improve Maintainability  
+**Suggested Q11 Features Implemented:** Modular Structure, Config Files, System Settings, Activity Logs, Code Comments  
 
 ---
 
-## 1. Project structure
+## 1. Overview & Modern Architecture
 
-The system is organised as small, single-purpose modules rather than one
-large file, which is itself the core evidence for the assigned **Q11 —
-Improve Maintainability** goal.
+A Python 3 + Tkinter + SQLite desktop Library Management System built with a strict layered architecture (UI screens, business services, database persistence, centralized configuration, and utility cross-cutting concerns).
+
+### Key Highlights
+- **Role-Based Portals**:
+  - **Admin / Staff**: Full circulation desk, book catalog management, member directory, audit logs, system settings, and analytics.
+  - **Student / Faculty Self-Service Portal**: Personal borrowing dashboard, active loans with due-date countdowns and automatic fine calculation, library catalog live search, and borrowing history.
+- **Modern User Experience**:
+  - **Vertical Sidebar Navigation**: Sleek enterprise-style sidebar on the left with active tab highlighting and role badges.
+  - **Dark / Light Mode**: Instant one-click toggle with persistent user preference storage in `config/settings.json`.
+  - **Clean Presentation**: Dedicated to real-world library operations without cluttering end-user screens with internal course rubric tags.
+- **Robust Engineering & TQM Controls**:
+  - **Poka-Yoke Input Validation** at every form layer to prevent invalid entries.
+  - **Comprehensive Audit Trail** recording user, timestamp, module, and action attribution.
+  - **Dual-Persisted System Settings** (JSON + SQLite) allowing zero-downtime reconfiguration of loan durations, overdue fines, and quotas.
+
+---
+
+## 2. Repository Structure
 
 ```
-├── main.py                  # tiny entry point — only starts the app
+├── main.py                     # Single entry point: boots LibraryApp shell
 ├── requirements.txt
-├── config/                  # Q11: centralized configuration & system settings
-│   ├── config.py            #   paths + load_settings()/save_settings()
-│   └── settings.json        #   editable system settings (no code changes needed)
-├── database/
-│   ├── database.py          # schema + connect()/initialize()
-│   └── seed_data.py         # demo data for the live walkthrough
-├── services/                # business logic, no UI code
-│   ├── book_service.py
-│   ├── member_service.py
-│   ├── issue_service.py
-│   └── report_service.py
-├── screens/                 # one file per UI screen (Q11: modular structure)
-│   ├── app_shell.py         #   Tk root window, header/nav bar, shared layout helpers
-│   ├── dashboard_screen.py
-│   ├── books_screen.py
-│   ├── members_screen.py
-│   ├── transactions_screen.py
-│   ├── quality_screen.py
-│   └── logs_screen.py
-├── utils/                   # cross-cutting concerns
-│   ├── validators.py        # Poka-Yoke input validation
-│   ├── logger.py             # activity/audit + error logging
-│   └── error_handler.py
-├── tests/
-│   └── test_validation.py
-├── docs/                    # SRS, CTQ tree, SIPOC, FMEA, user manual, etc.
-├── atqm/                    # applied TQM evidence: PDCA log, Pareto/Fishbone, checksheets
-└── reference_material/      # the course's own guideline docs, kept for the record
+├── .gitignore
+├── README.md
+├── CONTEXT_HANDOFF.md
+├── config/                     # Q11: Centralized configuration layer
+│   ├── config.py               #   Settings loader, paths & defaults
+│   └── settings.json           #   Editable runtime system settings (JSON)
+├── database/                   # Q11: Persistence layer
+│   ├── database.py             #   Schema, foreign-key enforcement & migrations
+│   └── seed_data.py            #   26+ books, 12 members (students & faculty), loans
+├── services/                   # Business logic layer (No UI code)
+│   ├── book_service.py         #   CRUD + multi-field catalog search
+│   ├── member_service.py       #   Member registration & directory queries
+│   ├── issue_service.py        #   Issue, return, availability & duplicate check
+│   └── report_service.py       #   Live operational statistics & telemetry
+├── screens/                    # Q11: Modular UI layer (One file per screen)
+│   ├── __init__.py             #   render(app) contract definition
+│   ├── app_shell.py            #   Sidebar navigation, Dark/Light mode & chrome
+│   ├── dashboard_screen.py     #   KPI metrics, quick operations, circulation feed
+│   ├── student_portal_screen.py#   Student/Faculty self-service portal
+│   ├── books_screen.py         #   Book catalog, search, add, delete
+│   ├── members_screen.py       #   Student & faculty membership directory
+│   ├── transactions_screen.py  #   Issue & return circulation desk
+│   ├── quality_screen.py       #   Analytics & system health telemetry
+│   ├── logs_screen.py          #   Audit trail & exception logs with CSV export
+│   ├── settings_screen.py      #   System settings & circulation policy UI
+│   └── login_screen.py         #   Role-based sign in & profile switcher
+├── utils/                      # Cross-cutting utilities
+│   ├── validators.py           #   Poka-Yoke error prevention validators
+│   ├── logger.py               #   Activity & error logging to DB and file
+│   └── error_handler.py        #   Centralized exception handling
+├── tests/                      # Automated test suite (18 unit tests)
+│   ├── test_validation.py      #   Poka-Yoke validator assertions
+│   ├── test_services.py        #   Isolated business logic & stock tests
+│   └── test_config.py          #   Settings persistence & defaults tests
+├── atqm/                       # Applied TQM evidence for Reviews 3 & 4
+│   ├── pareto_analysis.py      #   Statistical Quality Control 80/20 script
+│   ├── pareto_chart.png        #   Generated Pareto defect frequency chart
+│   ├── quality_monitor.py      #   Automated metrics & architecture auditor
+│   ├── quality_report.txt      #   Generated quality report
+│   └── FMEA.md, checksheet.md, PDCA_log.md, SIPOC.md, etc.
+└── reference_material/         # Official course allotment and guidelines
 ```
 
-**Why this shape?** Every screen only needs to know how to draw itself and
-call into `services/`; every service only needs to know how to talk to
-`database/`. Adding a 7th screen, or swapping SQLite for another database,
-touches one file at a time instead of a single monolith — the direct,
-demonstrable outcome of the Q11 quality goal.
+---
 
-## 2. Running the app
+## 3. Getting Started
 
+### Prerequisites
+- Python 3.10+
+- Tkinter (included with standard Python on Windows/macOS)
+
+### Installation & Execution
 ```bash
+# Clone or navigate to the repository directory
+cd Neha_Rawat_Library_Management_TQM
+
+# Install optional dependencies
 pip install -r requirements.txt
+
+# Launch the Library Management System
 python main.py
 ```
 
-Demo credentials seeded into the `users` table (login screen not wired up
-in this build — the session is fixed to `admin` for the live demo):
-- `admin` / `admin123`
-- `staff` / `staff123`
+### Running Automated Tests
+```bash
+python -m unittest discover tests
+```
+*All 18 unit tests run in <0.3s against isolated in-memory/temporary test stores.*
 
-## 3. Q11 — Improve Maintainability: evidence map
+---
 
-| Suggested feature | Where it lives |
-|---|---|
-| Modular structure | `services/`, `screens/`, `utils/`, `database/`, `config/` — each with one responsibility |
-| Config files | `config/config.py`, `config/settings.json` |
-| System settings | `config.load_settings()` / `save_settings()`, backed by `settings.json` |
-| Activity logs | `utils/logger.py` → `activity_logs` table + `logs/activity.log`, viewable on the **Audit Logs** screen |
-| Code comments / docstrings | Module-level docstrings in every file explaining its single responsibility |
+## 4. Default Seed Accounts for Testing & Viva
 
-## 4. TQM tool evidence (for the 4 reviews + viva)
+| Role | Username | Password | Member Code | Linked Identity |
+|:---|:---|:---|:---|:---|
+| **Administrator** | `admin` | `admin123` | *N/A* | Full system access & settings |
+| **Staff / Librarian** | `staff` | `staff123` | *N/A* | Circulation desk & inventory |
+| **Student** | `neha` | `student123` | `M001` | Neha Rawat (Student Portal) |
+| **Student** | `aarav` | `student123` | `M002` | Aarav Sharma (Student Portal) |
+| **Student** | `priya` | `student123` | `M003` | Priya Patel (Student Portal) |
+| **Faculty** | `prof_verma`| `faculty123` | `F001` | Prof. K. Verma (Faculty Portal)|
+| **Faculty** | `dr_gupta`  | `faculty123` | `F002` | Dr. Shalini Gupta (Faculty Portal)|
 
-| Review | Artefacts | Location |
-|---|---|---|
-| Review 1 — Setup & SRS | System architecture, SRS, CTQ tree | `docs/system_architecture.md`, `docs/SRS.md`, `docs/CTQ_tree.md` |
-| Review 2 — Base CRUD + Q11 features | Working CRUD screens + Q11 evidence above | `screens/`, `services/`, section 3 above |
-| Review 3 — FMEA & risk audit | SIPOC diagram, FMEA matrix with RPN | `docs/SIPOC.md`, `docs/FMEA.md`, `atqm/FMEA.md` |
-| Review 4 — SQC & continuous improvement | Checksheet, Pareto chart, Fishbone diagram, PDCA log | `atqm/checksheet.md`, `atqm/pareto_analysis.py`, `atqm/fishbone_analysis.md`, `atqm/PDCA_log.md` |
-| Documentation & GitHub health | This README, `docs/user_manual.md`, full commit history | repo root, `docs/`, `git log` |
+*(The login screen also provides a **Student & Faculty Direct Access** dropdown for instant, one-click profile switching during live evaluation.)*
 
-## 5. Important notes
+---
 
-- This is a local academic/demo system. Change the demo credentials before
-  any real deployment.
-- Quality statistics shown on the **Quality Monitor** screen are computed
-  live from actual application data (`services/report_service.py`) — no
-  fabricated numbers, in line with the "Fact-Based Decision Making" TQM
-  principle.
-- `library.db`, `logs/*.log` and `__pycache__/` are intentionally untracked
-  (see `.gitignore`) since they are generated at runtime, not source.
-- `CONTEXT_HANDOFF.md` at the repo root captures the full project context
-  (assignment details, decisions made, and what's left to do) so the work
-  can be picked up in a new chat or handed to a different AI assistant
-  without losing continuity.
+## 5. Statistical Quality Control (SQC) Tools
+
+To generate or refresh the Pareto 80/20 chart and quality telemetry report:
+```bash
+# Generate Pareto Chart (saved to atqm/pareto_chart.png)
+python atqm/pareto_analysis.py
+
+# Generate Maintainability & Quality Report (saved to atqm/quality_report.txt)
+python atqm/quality_monitor.py
+```
