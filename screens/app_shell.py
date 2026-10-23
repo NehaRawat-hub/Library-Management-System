@@ -1,22 +1,15 @@
 """
 screens/app_shell.py
 ---------------------
-The application shell: the Tk root window, the header/nav bar, and the
-shared layout helpers (base(), table()) that every screen reuses.
-
-This file intentionally contains NO business logic and NO screen-specific
-widgets. Its only job is:
-  1. Bootstrap the database on startup.
-  2. Provide consistent chrome (header + navigation bar).
-  3. Route each nav button to the matching screen module's render(app).
-
-Adding a new screen therefore never requires touching this file's layout
-code -- just add a module under screens/ and one line in NAV_ITEMS below.
+The application shell: modern vertical sidebar navigation, dark/light mode
+support, role-based screen routing (Admin, Staff, Student, Faculty), and
+reusable UI layout helpers.
 """
 
 import tkinter as tk
 from tkinter import ttk
 
+from config.config import load_settings, save_settings
 from database.database import initialize
 from database.seed_data import seed
 
@@ -29,96 +22,323 @@ from screens import (
     logs_screen,
     settings_screen,
     login_screen,
+    student_portal_screen,
 )
 
-APP_TITLE = "Library Management System — TQM Edition"
-BG_BODY = "#f4f6f8"
-BG_HEADER = "#16202a"
-BG_NAV = "#22303d"
+APP_TITLE = "Library Management System"
+
+THEMES = {
+    "Light": {
+        "bg_main": "#f8fafc",
+        "bg_card": "#ffffff",
+        "bg_sidebar": "#1e293b",
+        "bg_sidebar_active": "#2563eb",
+        "bg_sidebar_hover": "#334155",
+        "fg_sidebar": "#f1f5f9",
+        "fg_sidebar_dim": "#94a3b8",
+        "fg_header": "#0f172a",
+        "fg_body": "#334155",
+        "fg_muted": "#64748b",
+        "card_border": "#e2e8f0",
+        "accent": "#2563eb",
+        "accent_hover": "#1d4ed8",
+        "table_bg": "#ffffff",
+        "table_fg": "#1e293b",
+        "table_heading_bg": "#f1f5f9",
+        "table_heading_fg": "#0f172a",
+    },
+    "Dark": {
+        "bg_main": "#0f172a",
+        "bg_card": "#1e293b",
+        "bg_sidebar": "#090d16",
+        "bg_sidebar_active": "#3b82f6",
+        "bg_sidebar_hover": "#1e293b",
+        "fg_sidebar": "#f8fafc",
+        "fg_sidebar_dim": "#64748b",
+        "fg_header": "#f8fafc",
+        "fg_body": "#cbd5e1",
+        "fg_muted": "#94a3b8",
+        "card_border": "#334155",
+        "accent": "#3b82f6",
+        "accent_hover": "#60a5fa",
+        "table_bg": "#1e293b",
+        "table_fg": "#f1f5f9",
+        "table_heading_bg": "#334155",
+        "table_heading_fg": "#f8fafc",
+    }
+}
 
 
 class LibraryApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        # --- Q11 maintainability: startup boots DB + demo seed data once ---
+        # Database initialization & seeding
         initialize()
         seed()
 
-        # --- current session (kept simple for this course project) ---
+        # Load persisted settings
+        self.settings = load_settings()
+        saved_theme = self.settings.get("theme", "Light")
+        self.theme_mode = "Dark" if saved_theme == "Dark" else "Light"
+
+        # Current session state
         self.username = "admin"
         self.role = "Admin"
+        self.member_code = None
+        self.current_screen_name = "dashboard"
 
-        # --- window chrome ---
+        # Window chrome
         self.title(APP_TITLE)
-        self.geometry("1180x720")
-        self.minsize(1000, 650)
-        self.configure(bg=BG_BODY)
+        self.geometry("1240x780")
+        self.minsize(1050, 680)
 
-        self.style = ttk.Style(self)
-        try:
-            self.style.theme_use("clam")
-        except Exception:
-            pass
-        self.style.configure("Treeview", rowheight=30, font=("Segoe UI", 10))
-        self.style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"))
-        self.style.configure("TButton", font=("Segoe UI", 10))
-
-        # --- nav bar -> screen module mapping ---
-        self.nav_items = [
-            ("Dashboard", self.show_dashboard),
-            ("Books", self.show_books),
-            ("Members", self.show_members),
-            ("Issue / Return", self.show_transactions),
-            ("Quality Monitor", self.show_quality),
-            ("Audit Logs", self.show_logs),
-            ("Settings", self.show_settings),
-        ]
-
+        self.apply_theme_styles()
         self.show_dashboard()
 
+    def get_theme(self):
+        return THEMES[self.theme_mode]
+
+    def toggle_theme(self):
+        self.theme_mode = "Dark" if self.theme_mode == "Light" else "Light"
+        self.settings["theme"] = self.theme_mode
+        save_settings(self.settings)
+        self.apply_theme_styles()
+        self.refresh_current_screen()
+
+    def apply_theme_styles(self):
+        theme = self.get_theme()
+        self.configure(bg=theme["bg_main"])
+
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+
+        style.configure(
+            "Treeview",
+            background=theme["table_bg"],
+            foreground=theme["table_fg"],
+            fieldbackground=theme["table_bg"],
+            rowheight=32,
+            font=("Segoe UI", 10),
+            borderwidth=0
+        )
+        style.configure(
+            "Treeview.Heading",
+            background=theme["table_heading_bg"],
+            foreground=theme["table_heading_fg"],
+            font=("Segoe UI", 10, "bold"),
+            borderwidth=1,
+            relief="flat"
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", theme["accent"])],
+            foreground=[("selected", "white")]
+        )
+        style.configure("TNotebook", background=theme["bg_main"], borderwidth=0)
+        style.configure("TNotebook.Tab", background=theme["bg_card"], foreground=theme["fg_body"], padding=[14, 6])
+
     # ------------------------------------------------------------------
-    # Shared layout helpers used by every screen module
+    # Base Layout with Vertical Sidebar
     # ------------------------------------------------------------------
     def clear(self):
         for w in self.winfo_children():
             w.destroy()
 
-    def header(self, title, subtitle=""):
-        frame = tk.Frame(self, bg=BG_HEADER, height=80)
-        frame.pack(fill="x")
-        tk.Label(frame, text=title, bg=BG_HEADER, fg="white",
-                 font=("Segoe UI", 22, "bold")).pack(anchor="w", padx=28, pady=(16, 0))
-        if subtitle:
-            tk.Label(frame, text=subtitle, bg=BG_HEADER, fg="#c9d2dc",
-                     font=("Segoe UI", 10)).pack(anchor="w", padx=30, pady=(2, 10))
-
-    def nav(self):
-        bar = tk.Frame(self, bg=BG_NAV, height=50)
-        bar.pack(fill="x")
-        for text, cmd in self.nav_items:
-            tk.Button(bar, text=text, command=cmd, bg=BG_NAV, fg="white",
-                      activebackground="#34495e", activeforeground="white",
-                      bd=0, padx=14, pady=12, font=("Segoe UI", 10, "bold")).pack(side="left")
-
-        # Right side: user info + switch user / login button
-        right_box = tk.Frame(bar, bg=BG_NAV)
-        right_box.pack(side="right", padx=16)
-
-        tk.Label(right_box, text=f"Logged in: {self.username} ({self.role})",
-                 bg=BG_NAV, fg="#dce5ed", font=("Segoe UI", 9)).pack(side="left", padx=(0, 10))
-
-        tk.Button(right_box, text="Switch User", command=self.show_login,
-                  bg="#34495e", fg="white", activebackground="#46627f",
-                  font=("Segoe UI", 9, "bold"), bd=0, padx=8, pady=4).pack(side="left")
-
     def base(self, title, subtitle=""):
-        """Clear the window and draw header + nav; returns the empty body frame."""
+        """Draws the vertical sidebar and returns the main scrollable body frame."""
         self.clear()
-        self.header(title, subtitle)
-        self.nav()
-        body = tk.Frame(self, bg=BG_BODY)
-        body.pack(fill="both", expand=True, padx=24, pady=22)
+        theme = self.get_theme()
+
+        # Root horizontal container
+        container = tk.Frame(self, bg=theme["bg_main"])
+        container.pack(fill="both", expand=True)
+
+        # ----------------- Left Sidebar -----------------
+        sidebar = tk.Frame(container, bg=theme["bg_sidebar"], width=230)
+        sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
+
+        # Brand / Logo
+        brand_frame = tk.Frame(sidebar, bg=theme["bg_sidebar"], pady=18, padx=16)
+        brand_frame.pack(fill="x")
+
+        tk.Label(
+            brand_frame,
+            text="📚 LibraryOS",
+            bg=theme["bg_sidebar"],
+            fg=theme["fg_sidebar"],
+            font=("Segoe UI", 16, "bold")
+        ).pack(anchor="w")
+
+        tk.Label(
+            brand_frame,
+            text="Intelligent Library System",
+            bg=theme["bg_sidebar"],
+            fg=theme["fg_sidebar_dim"],
+            font=("Segoe UI", 8)
+        ).pack(anchor="w", pady=(2, 0))
+
+        tk.Frame(sidebar, bg=theme["bg_sidebar_hover"], height=1).pack(fill="x", padx=12, pady=(0, 10))
+
+        # User Badge in Sidebar
+        user_card = tk.Frame(sidebar, bg=theme["bg_sidebar_hover"], padx=12, pady=10)
+        user_card.pack(fill="x", padx=12, pady=(0, 14))
+
+        role_colors = {
+            "Admin": "#f59e0b",
+            "Staff": "#06b6d4",
+            "Student": "#10b981",
+            "Faculty": "#a855f7"
+        }
+        badge_color = role_colors.get(self.role, "#3b82f6")
+
+        user_header = tk.Frame(user_card, bg=theme["bg_sidebar_hover"])
+        user_header.pack(fill="x")
+
+        tk.Label(
+            user_header,
+            text="👤 " + self.username.capitalize(),
+            bg=theme["bg_sidebar_hover"],
+            fg=theme["fg_sidebar"],
+            font=("Segoe UI", 10, "bold")
+        ).pack(side="left")
+
+        role_badge = tk.Label(
+            user_header,
+            text=f" {self.role} ",
+            bg=badge_color,
+            fg="white",
+            font=("Segoe UI", 8, "bold")
+        )
+        role_badge.pack(side="right")
+
+        if self.member_code:
+            tk.Label(
+                user_card,
+                text=f"ID: {self.member_code}",
+                bg=theme["bg_sidebar_hover"],
+                fg=theme["fg_sidebar_dim"],
+                font=("Segoe UI", 8)
+            ).pack(anchor="w", pady=(3, 0))
+
+        # Dynamic Nav Items by Role
+        nav_container = tk.Frame(sidebar, bg=theme["bg_sidebar"])
+        nav_container.pack(fill="both", expand=True, padx=8)
+
+        if self.role in ["Student", "Faculty"]:
+            nav_items = [
+                ("👤 My Portal", self.show_student_portal, "student_portal"),
+                ("📖 Catalog Search", self.show_books, "books"),
+                ("📊 Library Stats", self.show_dashboard, "dashboard"),
+            ]
+        else:
+            nav_items = [
+                ("📊 Dashboard", self.show_dashboard, "dashboard"),
+                ("📚 Books Catalog", self.show_books, "books"),
+                ("👥 Members", self.show_members, "members"),
+                ("🔄 Issue / Return", self.show_transactions, "transactions"),
+                ("🎓 Student Portal", self.show_student_portal, "student_portal"),
+                ("📈 Analytics", self.show_quality, "quality"),
+                ("📋 Activity Logs", self.show_logs, "logs"),
+            ]
+            if self.role == "Admin":
+                nav_items.append(("⚙️ Settings", self.show_settings, "settings"))
+
+        for label, cmd, screen_key in nav_items:
+            is_active = (self.current_screen_name == screen_key)
+            btn_bg = theme["bg_sidebar_active"] if is_active else theme["bg_sidebar"]
+            btn_fg = "white" if is_active else theme["fg_sidebar"]
+
+            btn = tk.Button(
+                nav_container,
+                text=f"  {label}",
+                command=cmd,
+                bg=btn_bg,
+                fg=btn_fg,
+                activebackground=theme["bg_sidebar_hover"],
+                activeforeground="white",
+                bd=0,
+                anchor="w",
+                padx=12,
+                pady=9,
+                font=("Segoe UI", 10, "bold" if is_active else "normal")
+            )
+            btn.pack(fill="x", pady=2)
+
+        # Bottom Controls (Theme toggle & Switch user)
+        bottom_frame = tk.Frame(sidebar, bg=theme["bg_sidebar"], pady=12, padx=10)
+        bottom_frame.pack(side="bottom", fill="x")
+
+        # Theme Toggle Button
+        theme_label = "🌙 Dark Mode" if self.theme_mode == "Light" else "☀️ Light Mode"
+        tk.Button(
+            bottom_frame,
+            text=theme_label,
+            command=self.toggle_theme,
+            bg=theme["bg_sidebar_hover"],
+            fg=theme["fg_sidebar"],
+            activebackground=theme["bg_sidebar_active"],
+            activeforeground="white",
+            bd=0,
+            padx=10,
+            pady=6,
+            font=("Segoe UI", 9, "bold")
+        ).pack(fill="x", pady=(0, 6))
+
+        # Logout / Switch User
+        tk.Button(
+            bottom_frame,
+            text="🚪 Switch Account",
+            command=self.show_login,
+            bg="#ef4444" if self.theme_mode == "Dark" else "#dc2626",
+            fg="white",
+            activebackground="#b91c1c",
+            activeforeground="white",
+            bd=0,
+            padx=10,
+            pady=6,
+            font=("Segoe UI", 9, "bold")
+        ).pack(fill="x")
+
+        # ----------------- Main Right Content Area -----------------
+        content_area = tk.Frame(container, bg=theme["bg_main"])
+        content_area.pack(side="right", fill="both", expand=True)
+
+        # Top Header Bar
+        top_header = tk.Frame(content_area, bg=theme["bg_card"], height=70, bd=1, relief="solid")
+        top_header.pack(fill="x")
+        top_header.pack_propagate(False)
+
+        header_inner = tk.Frame(top_header, bg=theme["bg_card"])
+        header_inner.pack(fill="both", expand=True, padx=28, pady=10)
+
+        title_box = tk.Frame(header_inner, bg=theme["bg_card"])
+        title_box.pack(side="left", anchor="w")
+
+        tk.Label(
+            title_box,
+            text=title,
+            bg=theme["bg_card"],
+            fg=theme["fg_header"],
+            font=("Segoe UI", 18, "bold")
+        ).pack(anchor="w")
+
+        if subtitle:
+            tk.Label(
+                title_box,
+                text=subtitle,
+                bg=theme["bg_card"],
+                fg=theme["fg_muted"],
+                font=("Segoe UI", 9)
+            ).pack(anchor="w", pady=(1, 0))
+
+        # Body container
+        body = tk.Frame(content_area, bg=theme["bg_main"])
+        body.pack(fill="both", expand=True, padx=26, pady=20)
         return body
 
     def table(self, parent, columns, widths=None):
@@ -126,32 +346,59 @@ class LibraryApp(tk.Tk):
         for i, c in enumerate(columns):
             tree.heading(c, text=c)
             tree.column(c, width=(widths[i] if widths else 120), anchor="w")
-        tree.pack(fill="both", expand=True, pady=12)
+        tree.pack(fill="both", expand=True, pady=10)
         return tree
 
     # ------------------------------------------------------------------
-    # Screen routing -- each of these just delegates to screens/*.py
+    # Screen routing
     # ------------------------------------------------------------------
+    def refresh_current_screen(self):
+        screen_map = {
+            "dashboard": self.show_dashboard,
+            "books": self.show_books,
+            "members": self.show_members,
+            "transactions": self.show_transactions,
+            "student_portal": self.show_student_portal,
+            "quality": self.show_quality,
+            "logs": self.show_logs,
+            "settings": self.show_settings,
+            "login": self.show_login,
+        }
+        fn = screen_map.get(self.current_screen_name, self.show_dashboard)
+        fn()
+
     def show_dashboard(self):
+        self.current_screen_name = "dashboard"
         dashboard_screen.render(self)
 
     def show_books(self):
+        self.current_screen_name = "books"
         books_screen.render(self)
 
     def show_members(self):
+        self.current_screen_name = "members"
         members_screen.render(self)
 
     def show_transactions(self):
+        self.current_screen_name = "transactions"
         transactions_screen.render(self)
 
+    def show_student_portal(self):
+        self.current_screen_name = "student_portal"
+        student_portal_screen.render(self)
+
     def show_quality(self):
+        self.current_screen_name = "quality"
         quality_screen.render(self)
 
     def show_logs(self):
+        self.current_screen_name = "logs"
         logs_screen.render(self)
 
     def show_settings(self):
+        self.current_screen_name = "settings"
         settings_screen.render(self)
 
     def show_login(self):
+        self.current_screen_name = "login"
         login_screen.render(self)
