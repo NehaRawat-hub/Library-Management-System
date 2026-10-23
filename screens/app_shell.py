@@ -27,6 +27,8 @@ from screens import (
     transactions_screen,
     quality_screen,
     logs_screen,
+    settings_screen,
+    login_screen,
 )
 
 APP_TITLE = "Library Management System — TQM Edition"
@@ -70,6 +72,7 @@ class LibraryApp(tk.Tk):
             ("Issue / Return", self.show_transactions),
             ("Quality Monitor", self.show_quality),
             ("Audit Logs", self.show_logs),
+            ("Settings", self.show_settings),
         ]
 
         self.show_dashboard()
@@ -96,9 +99,18 @@ class LibraryApp(tk.Tk):
         for text, cmd in self.nav_items:
             tk.Button(bar, text=text, command=cmd, bg=BG_NAV, fg="white",
                       activebackground="#34495e", activeforeground="white",
-                      bd=0, padx=15, pady=12, font=("Segoe UI", 10, "bold")).pack(side="left")
-        tk.Label(bar, text=f"Logged in: {self.username} ({self.role})",
-                 bg=BG_NAV, fg="#dce5ed").pack(side="right", padx=20)
+                      bd=0, padx=14, pady=12, font=("Segoe UI", 10, "bold")).pack(side="left")
+
+        # Right side: user info + switch user / login button
+        right_box = tk.Frame(bar, bg=BG_NAV)
+        right_box.pack(side="right", padx=16)
+
+        tk.Label(right_box, text=f"Logged in: {self.username} ({self.role})",
+                 bg=BG_NAV, fg="#dce5ed", font=("Segoe UI", 9)).pack(side="left", padx=(0, 10))
+
+        tk.Button(right_box, text="Switch User", command=self.show_login,
+                  bg="#34495e", fg="white", activebackground="#46627f",
+                  font=("Segoe UI", 9, "bold"), bd=0, padx=8, pady=4).pack(side="left")
 
     def base(self, title, subtitle=""):
         """Clear the window and draw header + nav; returns the empty body frame."""
@@ -137,3 +149,9 @@ class LibraryApp(tk.Tk):
 
     def show_logs(self):
         logs_screen.render(self)
+
+    def show_settings(self):
+        settings_screen.render(self)
+
+    def show_login(self):
+        login_screen.render(self)

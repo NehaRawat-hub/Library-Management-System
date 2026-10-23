@@ -1,0 +1,30 @@
+========================================================================
+  BBAT104 TQM QUALITY MONITOR — STATISTICAL PROCESS REPORT
+  Student: Neha Rawat (Reg No. 2410302041, Section B)
+  Goal: Q11 — Improve Maintainability | System: Library Management
+========================================================================
+
+[1] OPERATIONAL QUALITY METRICS (Fact-Based Decision Making):
+  • Total Operations Logged (Audit Trail): 11
+  • Total Defects Recorded:               12 ({'HIGH': 1, 'LOW': 6, 'MEDIUM': 5})
+  • System Operational Reliability:       47.83%
+  • Defect Density per 100 Operations:    52.17%
+  • Active Book Circulation:              0 active issues (0.0% circulation)
+  • Total Registered Members:             3
+
+[2] ASSIGNED Q11 MAINTAINABILITY ARCHITECTURE AUDIT:
+  • Total Codebase Size:                  1376 SLOC across 21 files
+    - UI Screens                         : 10 files, 1018 SLOC (74.0%)
+    - Business Services                  : 4 files,  108 SLOC ( 7.8%)
+    - Database Persistence               : 2 files,  141 SLOC (10.2%)
+    - Configuration                      : 1 files,   29 SLOC ( 2.1%)
+    - Utilities (Poka-Yoke & Logging)    : 3 files,   67 SLOC ( 4.9%)
+    - Test Suites                        : 1 files,   13 SLOC ( 0.9%)
+
+[3] Q11 QUALITY GOAL COMPLIANCE CHECKLIST:
+  [PASS] Feature 1: Modular Structure      (Strict separation of UI, service, data, config)
+  [PASS] Feature 2: Config Files           (settings.json & config.py decoupled)
+  [PASS] Feature 3: System Settings        (Runtime editable via UI & synced to SQLite)
+  [PASS] Feature 4: Activity Logs          (Audit logs with user, role, action, and timestamp)
+  [PASS] Feature 5: Code Comments          (Standardized docstrings & type hints throughout)
+========================================================================
